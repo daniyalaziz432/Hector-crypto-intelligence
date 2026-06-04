@@ -17,7 +17,7 @@ A Bloomberg Terminal-inspired crypto analysis dashboard built entirely on free d
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/hector
+git clone https://github.com/daniyalaziz432/hector
 cd hector
 pip install -r requirements.txt
 streamlit run hector.py
