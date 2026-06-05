@@ -7,7 +7,7 @@ A Bloomberg Terminal-inspired crypto analysis dashboard built entirely on free d
 ## Features
 
 - **20 Enhancements** — ML pipeline, backtesting, live feed, paper trading, portfolio optimisation, and more
-- **50 Assets** — Bitcoin, Ethereum, and 48 other cryptocurrencies
+- **50 Assets** — Bitcoin, Ethereum, and 48 other cryptocurrencies 
 - **100% Free Data** — yfinance · CoinGecko · alternative.me · Reddit · CryptoCompare
 - **Multi-Model Ensemble** — Random Forest, Gradient Boosting, Logistic Regression, XGBoost (optional), LightGBM (optional)
 - **Advanced Analytics** — Triple Barrier Labels, HRP Portfolio, Efficient Frontier, HMM Regime Detection, SHAP explainability
