@@ -1,3 +1,4 @@
+
 # PAGE CONFIG
 
 import streamlit as st
@@ -4185,12 +4186,6 @@ def main() -> None:
     # Regime detection (must happen BEFORE ML pipeline)
     regime = classify_regime(df)
 
-    render_kpi(df, info, gm, fg)
-
-    alerts = check_alerts(df, info)
-    if alerts:
-        render_alerts(alerts)
-
     # 1. Initialize ALL variables to safe defaults
     labels_df      = pd.DataFrame()
     feat_df        = pd.DataFrame()
@@ -4248,138 +4243,175 @@ def main() -> None:
 
         _lab_key = f"lab_done_{cfg['yf_sym']}_{cfg['period']}_{cfg['interval']}_{cfg['pt_mult']}_{cfg['sl_mult']}_{cfg['max_hold']}"
         _lab_cached = st.session_state.get(_lab_key, False)
-        _spinner_lab = st.spinner("Computing Alpha Lab…") if not _lab_cached else \
-                       contextlib.nullcontext()
-        with _spinner_lab:
-            stability_df = feature_stability_analysis(feat_df)
-            baselines    = run_baseline_benchmarks(feat_df, df["Close"].squeeze())
 
-            wf_folds     = walk_forward_train_test(feat_df, df["Close"].squeeze())
+        if not _lab_cached:
+            with st.spinner("Computing Alpha Lab…"):
+                stability_df = feature_stability_analysis(feat_df)
+                baselines    = run_baseline_benchmarks(feat_df, df["Close"].squeeze())
 
-            if mr:
-                best_k  = ("Ensemble" if "Ensemble" in mr
-                            else max(mr, key=lambda k: mr[k]["cv_f1"]))
-                best_mr = mr[best_k]
-                cal_clf = calibrate_probabilities(best_mr["model"], best_mr["scaler"],
-                                                   feat_df, method="platt")
+                wf_folds     = walk_forward_train_test(feat_df, df["Close"].squeeze())
 
-            if mr and not signals_df.empty:
-                meta_result = train_meta_model(
-                    signals_df["prob"].values if "prob" in signals_df.columns
-                    else np.full(len(feat_df), 0.5),
-                    feat_df, labels_df,
-                )
-                if meta_result:
-                    signals_df = apply_meta_filter(signals_df, meta_result, feat_df,
-                                                   confidence_min=cfg["conf_thr"])
-                    bt = (run_backtest(df["Close"].squeeze(), signals_df, cfg["commission"])
-                          if not signals_df.empty else bt)
+                if mr:
+                    best_k  = ("Ensemble" if "Ensemble" in mr
+                                else max(mr, key=lambda k: mr[k]["cv_f1"]))
+                    best_mr = mr[best_k]
+                    cal_clf = calibrate_probabilities(best_mr["model"], best_mr["scaler"],
+                                                       feat_df, method="platt")
 
-            adv_bt = advanced_backtest(
-                df["Close"].squeeze(), signals_df,
-                commission=cfg["commission"],
-                latency_bars=1, max_hold_bars=cfg["max_hold"],
-                max_dd_cap=-0.20, vol_target=0.15,
-            ) if not signals_df.empty else {}
-
-            if mr and not feat_df.empty:
-                try:
-                    df_lb = feat_df[feat_df["label"] != 0].copy()
-                    if len(df_lb) >= 20:
-                        avail_ = [c for c in FEATURE_COLS if c in df_lb.columns]
-                        best_k2 = ("Ensemble" if "Ensemble" in mr
-                                    else max(mr, key=lambda k: mr[k]["cv_f1"]))
-                        raw_p = mr[best_k2]["model"].predict_proba(
-                            mr[best_k2]["scaler"].transform(
-                                df_lb[avail_].fillna(0).values.astype(float)
-                            )
-                        )[:, 1]
-                        reg_arr = detect_regime(df["returns"])
-                        reg_aligned = reg_arr[-len(df_lb):] if len(reg_arr) >= len(df_lb) \
-                                      else np.ones(len(df_lb), dtype=int)
-                        dyn_thresholds = optimise_threshold_per_regime(
-                            raw_p, (df_lb["label"] == 1).astype(int).values,
-                            reg_aligned,
-                        )
-                except Exception:
-                    pass
-
-            sig_tests = significance_tests(bt.get("returns", pd.Series(dtype=float))) if bt else {}
-
-            if not feat_df.empty and len(feat_df) >= 20:
-                half     = len(feat_df) // 2
-                drift_df = detect_feature_drift(
-                    feat_df.iloc[:half], feat_df.iloc[half:], cfg["yf_sym"]
-                )
-
-            regime_series = pd.Series(dtype=str)
-            if "returns" in df.columns:
-                labels_r = detect_regime(df["returns"])
-                regime_series = pd.Series(
-                    ["bull" if v == 2 else "bear" if v == 0 else "sideways"
-                     for v in labels_r],
-                    index=df["returns"].dropna().index,
-                )
-
-            attr_dict = performance_attribution(
-                bt.get("returns", pd.Series(dtype=float)),
-                signals_df, feat_df, regime_series,
-            ) if bt else {}
-
-            decay_df = monitor_alpha_decay(
-                bt.get("returns", pd.Series(dtype=float)),
-                cfg["yf_sym"], window_days=7,
-            ) if bt else pd.DataFrame()
-
-            feedback = analyse_losing_trades(
-                bt.get("returns", pd.Series(dtype=float)),
-                signals_df, feat_df,
-            ) if bt else {}
-
-            constraints = apply_portfolio_constraints(
-                bt.get("returns", pd.Series(dtype=float))
-            ) if bt else {}
-
-            retrain_sched = retraining_schedule(
-                cfg["yf_sym"],
-                last_run=datetime.utcnow() - timedelta(hours=50),
-                drift_triggered=should_retrain(drift_df),
-                schedule="weekly",
-            )
-
-            if mr and bt:
-                run_id = log_experiment(
-                    cfg["yf_sym"],
-                    {"pt": cfg["pt_mult"], "sl": cfg["sl_mult"],
-                     "conf": cfg["conf_thr"], "period": cfg["period"]},
-                    mr, bt,
-                    notes=f"regime={regime}",
-                )
-
-            # Enhancement 15 — Auto-refinement
-            if feedback and mr:
-                best_k3 = ("Ensemble" if "Ensemble" in mr
-                            else max(mr, key=lambda k: mr[k]["cv_f1"]))
-                refined_result = auto_refine_model(feat_df, feedback, cfg["yf_sym"])
-                if refined_result and refined_result.get("improved"):
-                    ab_result = ab_test_models(
-                        mr[best_k3]["model"], refined_result["model"],
-                        mr[best_k3]["scaler"], refined_result["scaler"],
-                        feat_df,
+                if mr and not signals_df.empty:
+                    meta_result = train_meta_model(
+                        signals_df["prob"].values if "prob" in signals_df.columns
+                        else np.full(len(feat_df), 0.5),
+                        feat_df, labels_df,
                     )
+                    if meta_result:
+                        signals_df = apply_meta_filter(signals_df, meta_result, feat_df,
+                                                       confidence_min=cfg["conf_thr"])
+                        bt = (run_backtest(df["Close"].squeeze(), signals_df, cfg["commission"])
+                              if not signals_df.empty else bt)
 
-            # Enhancement 20 — Event-driven backtest + Monte Carlo
-            if not signals_df.empty:
-                edb_result = event_driven_backtest(
+                adv_bt = advanced_backtest(
                     df["Close"].squeeze(), signals_df,
                     commission=cfg["commission"],
-                )
-            if bt.get("returns") is not None and len(bt.get("returns", pd.Series(dtype=float))) > 10:
-                mc_result = monte_carlo_simulation(bt.get("returns", pd.Series(dtype=float)), n_paths=300, horizon=200)
+                    latency_bars=1, max_hold_bars=cfg["max_hold"],
+                    max_dd_cap=-0.20, vol_target=0.15,
+                ) if not signals_df.empty else {}
 
-            # Enhancement 17 — Health check
-            health = get_system_health()
-            st.session_state[_lab_key] = True
+                if mr and not feat_df.empty:
+                    try:
+                        df_lb = feat_df[feat_df["label"] != 0].copy()
+                        if len(df_lb) >= 20:
+                            avail_ = [c for c in FEATURE_COLS if c in df_lb.columns]
+                            best_k2 = ("Ensemble" if "Ensemble" in mr
+                                        else max(mr, key=lambda k: mr[k]["cv_f1"]))
+                            raw_p = mr[best_k2]["model"].predict_proba(
+                                mr[best_k2]["scaler"].transform(
+                                    df_lb[avail_].fillna(0).values.astype(float)
+                                )
+                            )[:, 1]
+                            reg_arr = detect_regime(df["returns"])
+                            reg_aligned = reg_arr[-len(df_lb):] if len(reg_arr) >= len(df_lb) \
+                                          else np.ones(len(df_lb), dtype=int)
+                            dyn_thresholds = optimise_threshold_per_regime(
+                                raw_p, (df_lb["label"] == 1).astype(int).values,
+                                reg_aligned,
+                            )
+                    except Exception:
+                        pass
+
+                sig_tests = significance_tests(bt.get("returns", pd.Series(dtype=float))) if bt else {}
+
+                if not feat_df.empty and len(feat_df) >= 20:
+                    half     = len(feat_df) // 2
+                    drift_df = detect_feature_drift(
+                        feat_df.iloc[:half], feat_df.iloc[half:], cfg["yf_sym"]
+                    )
+
+                regime_series = pd.Series(dtype=str)
+                if "returns" in df.columns:
+                    labels_r = detect_regime(df["returns"])
+                    regime_series = pd.Series(
+                        ["bull" if v == 2 else "bear" if v == 0 else "sideways"
+                         for v in labels_r],
+                        index=df["returns"].dropna().index,
+                    )
+
+                attr_dict = performance_attribution(
+                    bt.get("returns", pd.Series(dtype=float)),
+                    signals_df, feat_df, regime_series,
+                ) if bt else {}
+
+                decay_df = monitor_alpha_decay(
+                    bt.get("returns", pd.Series(dtype=float)),
+                    cfg["yf_sym"], window_days=7,
+                ) if bt else pd.DataFrame()
+
+                feedback = analyse_losing_trades(
+                    bt.get("returns", pd.Series(dtype=float)),
+                    signals_df, feat_df,
+                ) if bt else {}
+
+                constraints = apply_portfolio_constraints(
+                    bt.get("returns", pd.Series(dtype=float))
+                ) if bt else {}
+
+                retrain_sched = retraining_schedule(
+                    cfg["yf_sym"],
+                    last_run=datetime.utcnow() - timedelta(hours=50),
+                    drift_triggered=should_retrain(drift_df),
+                    schedule="weekly",
+                )
+
+                if mr and bt:
+                    run_id = log_experiment(
+                        cfg["yf_sym"],
+                        {"pt": cfg["pt_mult"], "sl": cfg["sl_mult"],
+                         "conf": cfg["conf_thr"], "period": cfg["period"]},
+                        mr, bt,
+                        notes=f"regime={regime}",
+                    )
+
+                # Auto-refinement
+                if feedback and mr:
+                    best_k3 = ("Ensemble" if "Ensemble" in mr
+                                else max(mr, key=lambda k: mr[k]["cv_f1"]))
+                    refined_result = auto_refine_model(feat_df, feedback, cfg["yf_sym"])
+                    if refined_result and refined_result.get("improved"):
+                        ab_result = ab_test_models(
+                            mr[best_k3]["model"], refined_result["model"],
+                            mr[best_k3]["scaler"], refined_result["scaler"],
+                            feat_df,
+                        )
+
+                # Event-driven backtest + Monte Carlo
+                if not signals_df.empty:
+                    edb_result = event_driven_backtest(
+                        df["Close"].squeeze(), signals_df,
+                        commission=cfg["commission"],
+                    )
+                if bt.get("returns") is not None and len(bt.get("returns", pd.Series(dtype=float))) > 10:
+                    mc_result = monte_carlo_simulation(bt.get("returns", pd.Series(dtype=float)), n_paths=300, horizon=200)
+
+                # Health check
+                health = get_system_health()
+
+                # Cache all lab results in session_state so reruns skip this block
+                st.session_state[_lab_key] = True
+                st.session_state[f"{_lab_key}_results"] = dict(
+                    stability_df=stability_df, baselines=baselines, wf_folds=wf_folds,
+                    cal_clf=cal_clf, meta_result=meta_result, signals_df=signals_df,
+                    bt=bt, adv_bt=adv_bt, dyn_thresholds=dyn_thresholds,
+                    sig_tests=sig_tests, drift_df=drift_df, attr_dict=attr_dict,
+                    decay_df=decay_df, feedback=feedback, constraints=constraints,
+                    retrain_sched=retrain_sched, run_id=run_id,
+                    refined_result=refined_result, ab_result=ab_result,
+                    edb_result=edb_result, mc_result=mc_result, health=health,
+                )
+        else:
+            # Restore cached lab results — zero recomputation on reruns
+            _cached = st.session_state.get(f"{_lab_key}_results", {})
+            stability_df   = _cached.get("stability_df",   stability_df)
+            baselines      = _cached.get("baselines",      baselines)
+            wf_folds       = _cached.get("wf_folds",       wf_folds)
+            cal_clf        = _cached.get("cal_clf",        cal_clf)
+            meta_result    = _cached.get("meta_result",    meta_result)
+            signals_df     = _cached.get("signals_df",     signals_df)
+            bt             = _cached.get("bt",             bt)
+            adv_bt         = _cached.get("adv_bt",        adv_bt)
+            dyn_thresholds = _cached.get("dyn_thresholds", dyn_thresholds)
+            sig_tests      = _cached.get("sig_tests",      sig_tests)
+            drift_df       = _cached.get("drift_df",      drift_df)
+            attr_dict      = _cached.get("attr_dict",      attr_dict)
+            decay_df       = _cached.get("decay_df",      decay_df)
+            feedback       = _cached.get("feedback",       feedback)
+            constraints    = _cached.get("constraints",    constraints)
+            retrain_sched  = _cached.get("retrain_sched",  retrain_sched)
+            run_id         = _cached.get("run_id",        run_id)
+            refined_result = _cached.get("refined_result", refined_result)
+            ab_result      = _cached.get("ab_result",     ab_result)
+            edb_result     = _cached.get("edb_result",    edb_result)
+            mc_result      = _cached.get("mc_result",     mc_result)
+            health         = _cached.get("health",        health)
 
     # 2. TABS
     tabs = st.tabs([
@@ -4400,6 +4432,10 @@ def main() -> None:
 
     #  TAB 0: MARKET OVERVIEW
     with tabs[0]:
+        render_kpi(df, info, gm, fg)
+        alerts = check_alerts(df, info)
+        if alerts:
+            render_alerts(alerts)
         st.markdown('<div class="sec-hdr">Live Price Action</div>', unsafe_allow_html=True)
         st.plotly_chart(
             fig_candle(df,
