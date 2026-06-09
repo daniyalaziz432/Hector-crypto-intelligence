@@ -1,73 +1,42 @@
 # ⬡ HECTOR — Crypto Financial Intelligence System
 
-A Bloomberg Terminal-inspired crypto analysis dashboard built entirely on free data sources. Zero API keys required.
+**Your Bloomberg Terminal, But Free.** 
+
+A professional-grade crypto analysis dashboard that won't cost you a penny. Built entirely on free public data sources — no API keys, no hidden fees, no subscription traps.
 
 ---
 
-## Features
+## ✨ What Makes HECTOR Special?
 
-- **20 Enhancements** — ML pipeline, backtesting, live feed, paper trading, portfolio optimisation, and more
-- **50 Assets** — Bitcoin, Ethereum, and 48 other cryptocurrencies 
-- **100% Free Data** — yfinance · CoinGecko · alternative.me · Reddit · CryptoCompare
-- **Multi-Model Ensemble** — Random Forest, Gradient Boosting, Logistic Regression, XGBoost (optional), LightGBM (optional)
-- **Advanced Analytics** — Triple Barrier Labels, HRP Portfolio, Efficient Frontier, HMM Regime Detection, SHAP explainability
+### 🎯 **20 Powerful Features** (That Actually Work)
+- **ML Pipeline** that learns from market patterns
+- **Live Backtesting** to validate your strategies
+- **Real-time Feed** simulating WebSocket data
+- **Paper Trading** to practice without risk
+- **Portfolio Optimisation** using institutional-grade algorithms
+- **50+ Crypto Assets** — from Bitcoin to the hottest alts
+
+### 💰 **100% Free — Really**
+- No API keys required
+- No rate limit anxiety (we handle it gracefully)
+- No "premium" features locked behind paywalls
+- Just pure, unfiltered crypto intelligence
+
+### 🧠 **Smart Under the Hood**
+- **Multi-Model Ensemble**: Random Forest, Gradient Boosting, Logistic Regression (plus optional XGBoost & LightGBM)
+- **Triple Barrier Labels** — the same technique used by quant hedge funds
+- **HMM Regime Detection** to know when markets switch between bull/bear/sideways
+- **HRP Portfolio Optimisation** — smarter than Markowitz
+- **SHAP Explainability** — understand *why* your model made that trade
 
 ---
 
-## Installation
+## 🚀 Quick Start
+
+### Clone & Run in 30 Seconds
 
 ```bash
 git clone https://github.com/daniyalaziz432/Hector-crypto-intelligence
-
-
----
-
-## click the link below to acess the app
-
- [huggingface.co/spaces](https://huggingface.co/spaces/daniyalaziz/hector-crypto)
-   
-
----
-
-## Tabs
-
-| Tab | Description |
-|---|---|
-| Market Overview | Live price, indicators, regime detection |
-| Signals | Triple-barrier labels and ML signals |
-| Models | Ensemble model metrics, SHAP importance, ROC curves |
-| Backtest | Equity curve, drawdown, walk-forward validation |
-| Risk | VaR, CVaR, stress testing, rolling Sharpe |
-| Portfolio | HRP weights, correlation matrix, efficient frontier |
-| Research | Fractional differentiation, entropy, CUSUM |
-| Sentiment | Reddit sentiment, crypto news, on-chain proxies |
-| Alpha Lab | Feature stability, drift detection, A/B testing |
-| Live Feed | Real-time 1-min bar polling |
-| Paper Trading | Simulated order management with risk controls |
-| System | Health check, library status, data sources |
-| Export | CSV, labels, signals, PDF report |
-
----
-
-## Data Sources (all free, no keys)
-
-- **yfinance** — OHLCV data (~2,000 requests/hour)
-- **CoinGecko** — Market data (30 requests/minute)
-- **alternative.me** — Fear & Greed Index (50 requests/minute)
-- **Reddit public JSON** — Sentiment analysis
-- **CryptoCompare** — Crypto news feed
-- **blockchain.info** — On-chain BTC stats
-
----
-
-## Optional Libraries (for enhanced functionality)
-
-```bash
-pip install xgboost lightgbm optuna shap hmmlearn lime joblib pyarrow statsmodels fpdf2
-```
-
-HECTOR degrades gracefully if any optional library is missing.
-
----
-
-Created by **Daniyal Aziz**
+cd hector
+pip install -r requirements.txt
+streamlit run app.py
