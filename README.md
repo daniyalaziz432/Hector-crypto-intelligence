@@ -17,19 +17,15 @@ A Bloomberg Terminal-inspired crypto analysis dashboard built entirely on free d
 ## Installation
 
 ```bash
-git clone https://github.com/daniyalaziz432/hector
-cd hector
-pip install -r requirements.txt
-streamlit run hector.py
-```
+git clone https://github.com/daniyalaziz432/Hector-crypto-intelligence
+
 
 ---
 
-## Deploy on Hugging Face Spaces
+## click the link below to acess the app
 
-1. Create a new **Streamlit** Space on [huggingface.co/spaces](https://huggingface.co/spaces)
-2. Upload `hector.py` and `requirements.txt`
-3. The app starts automatically — no environment variables needed
+ [huggingface.co/spaces](https://huggingface.co/spaces/daniyalaziz/hector-crypto)
+   
 
 ---
 
